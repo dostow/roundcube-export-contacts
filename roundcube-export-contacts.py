@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Export roundcube contacts in vcard format from mysql database.
+"""Export roundcube contacts in vcard format from sqlite database.
 """
 
 import argparse
 import codecs
 import json
-import mysql.connector
 import os
 import os.path
+import sqlite3
 from collections import namedtuple
 
 
@@ -35,50 +35,45 @@ def load_config(path):
     return config
 
 
-def get_users(mysql_cnx):
+def get_users(sqlite_cnx):
     """Get all 'user_id' and 'username' from 'users' table.
-
     Args:
-        mysql_cnx: connection to mysql database
-
+        sqlite_cnx: connection to sqlite database
     Returns:
-        mysql_users: sql query result
+        sqlite_users: sql query result
     """
 
-    mysql_cur = mysql_cnx.cursor()
-    query = ("SELECT user_id, username FROM users")
+    sqlite_cur = sqlite_cnx.cursor()
+    query = "SELECT user_id, username FROM users"
 
-    mysql_cur.execute(query)
-    mysql_users = mysql_cur.fetchall()
+    sqlite_cur.execute(query)
+    sqlite_users = sqlite_cur.fetchall()
 
-    return mysql_users
+    return sqlite_users
 
 
-def get_contacts(mysql_cnx, user):
+def get_contacts(sqlite_cnx, user):
     """Get 'email', 'vcard', 'words' and 'del' from contacts table.
-
     Args:
-        mysql_cnx: connection to mysql database
+        sqlite_cnx: connection to sqlite database
         user: User namedtuple
-
     Returns:
-        mysql_contacts: sql query result
+        sqlite_contacts: sql query result
     """
 
-    mysql_cur = mysql_cnx.cursor()
+    sqlite_cur = sqlite_cnx.cursor()
 
-    query = ("SELECT email, vcard, words, del FROM contacts WHERE user_id = %s")
+    query = "SELECT email, vcard, words, del FROM contacts WHERE user_id = ?"
     data = (user.id, )
 
-    mysql_cur.execute(query, data)
-    mysql_contacts = mysql_cur.fetchall()
+    sqlite_cur.execute(query, data)
+    sqlite_contacts = sqlite_cur.fetchall()
 
-    return mysql_contacts
+    return sqlite_contacts
 
 
 def save_vcard(out, vcard):
     """Save `vcard` data to `out` file.
-
     Args:
         out: output file
         vcard: vcard data
@@ -102,19 +97,19 @@ def main():
         os.mkdir(args.out)
 
     # connect to databases
-    mysql_cnx = mysql.connector.connect(buffered=True, **config["mysql"])
+    sqlite_cnx = sqlite3.connect(**config["sqlite"])
 
-    users = get_users(mysql_cnx)
+    users = get_users(sqlite_cnx)
     for user in users:
         user = User(user[0], user[1])
-        contacts = get_contacts(mysql_cnx, user)
+        contacts = get_contacts(sqlite_cnx, user)
         for contact in contacts:
             contact = Contact(contact[0], contact[1], contact[2], contact[3])
             filename = "%s_%s%s.vcf" % (user.email, user.id, "_deleted" if contact.deleted else "")
             out = os.path.join(args.out, filename)
             save_vcard(out, contact.vcard)
 
-    mysql_cnx.close()
+    sqlite_cnx.close()
 
 
 if __name__ == "__main__":

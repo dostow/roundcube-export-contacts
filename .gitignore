@@ -2,3 +2,5 @@
 out/*
 config.json
 venv
+*.db
+.history
